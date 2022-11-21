@@ -36,11 +36,17 @@ Bugtton::Bugtton(const uint8_t a, const uint8_t *b, uint8_t dt){
     _maskD = B00000000;
     _maskB = B00000000;
     _maskC = B00000000;
+#ifdef BUGTTON_IS_ATMEGA_32U4
     _maskE = B00000000;
+    _maskF = B00000000;
+#endif
     _idleD = B00000000;
     _idleB = B00000000;
     _idleC = B00000000;
+#ifdef BUGTTON_IS_ATMEGA_32U4
     _idleE = B00000000;
+    _idleF = B00000000;
+#endif
     _count = a;
     _debounceTime = dt;
     _allStable = false;
@@ -57,32 +63,42 @@ Bugtton::Bugtton(const uint8_t a, const uint8_t *b, uint8_t dt){
         int8_t pin = b[i];
 
         //remap pins for leonardo board
-        #ifdef BUGTTON_IS_ATMEGA_32U4
+        //output mode is not implemented yet
+#ifdef BUGTTON_IS_ATMEGA_32U4
         switch(pin) {
           case 0: pin = 2; break;//D2
           case 1: pin = 3; break;//D3
           case 2: pin = 1; break;//D1
           case 3: pin = 0; break;//D0
-          //case 4: pin = 4; break;//D4
+          //case 4: pin = 4; break;//D4 no need to remap
           case 5: pin = 22; break;//C6
           case 6: pin = 7; break;//D7
-          case 7: pin = 30; break;//E6 no idea... 30?
+          case 7: pin = 30; break;//E6
           case 8: pin = 12; break;//B4
           case 9: pin = 13; break;//B5
           case 10: pin = 20; break;//B6
           case 11: pin = 21; break;//B7
           case 12: pin = 6; break;//D6
-          //case 13: pin = ?; break;//C7 no idea...
-          case 14: pin = 11; break;//B3
-          case 15: pin = 9; break;//B1
-          case 16: pin = 10; break;//B2
-
-          //case 17: pin = ?; break;//B0
-          //case 18: pin = ?; break;//F7
-          //case 19: pin = ?; break;//F6
-          //case 20: pin = ?; break;//F5
+          case 13: pin = 23; break;//C7
+          case 14: pin = 11; break;//B3 MISO
+          case 15: pin = 9; break;//B1 SCK
+          case 16: pin = 10; break;//B2 MOSI
+          case 17: pin = 8; break;//B0 SS
+          case 18: pin = 47; break;//F7 A0
+          case 19: pin = 46; break;//F6 A1
+          case 20: pin = 45; break;//F5 A2
+          case 21: pin = 44; break;//F4 A3
+          case 22: pin = 41; break;//F1 A4
+          case 23: pin = 40; break;//F0 A5
+          case 24: pin = 4; break;//D4 A6 DUPLICATE
+          case 25: pin = 7; break;//D7 A7 DUPLICATE
+          case 26: pin = 12; break;//B4 A8 DUPLICATE
+          case 27: pin = 13; break;//B5 A9 DUPLICATE
+          case 28: pin = 20; break;//B6 A10 DUPLICATE
+          case 29: pin = 6; break;//D6 A11
+          case 30: pin = 5; break;//D5 TXLED
         }
-        #endif
+#endif
         
         if(pin<0){
             pin *= -1;
@@ -126,6 +142,7 @@ void Bugtton::makeMasks(){
             if (flippedBit(i)) bitWrite(_idleC, (_pins[i]-14), 0);
             else bitWrite(_idleC, (_pins[i]-14), 1);
         }
+#ifdef BUGTTON_IS_ATMEGA_32U4
         else if (_pins[i] >= 20 && _pins[i] < 22) {
           // Write to maskB (active buttons)
           bitWrite(_maskB, (_pins[i]-14), 1);
@@ -133,7 +150,7 @@ void Bugtton::makeMasks(){
           if (flippedBit(i)) bitWrite(_idleB, (_pins[i]-14), 0);
           else bitWrite(_idleB, (_pins[i]-14), 1);
         }
-        else if (_pins[i] == 22) { //C6
+        else if (_pins[i] >= 22 && _pins[i] < 24) { //C6, C7
           // Write to maskC (active buttons)
           bitWrite(_maskC, (_pins[i]-16), 1);
           // Write to idleC  (button idle state)
@@ -147,6 +164,14 @@ void Bugtton::makeMasks(){
           if (flippedBit(i)) bitWrite(_idleE, (_pins[i]-24), 0);
           else bitWrite(_idleE, (_pins[i]-24), 1);
         }
+        else if (_pins[i] >= 40 && _pins[i] < 48) { //F0 - F7
+          // Write to maskF (active buttons)
+          bitWrite(_maskF, (_pins[i]-24), 1);
+          // Write to idleF  (button idle state)
+          if (flippedBit(i)) bitWrite(_idleF, (_pins[i]-40), 0);
+          else bitWrite(_idleF, (_pins[i]-40), 1);
+        }
+#endif
     }
 }
 
@@ -166,8 +191,13 @@ void Bugtton::update(){
         // Buttons unpressed?
         if ((_idleD == (PIND&_maskD)) &&
             (_idleB == (PINB&_maskB)) &&
-            (_idleB == (PINC&_maskC)) &&
-            (_idleC == (PINE&_maskE)) ){
+            (_idleC == (PINC&_maskC))
+#ifdef BUGTTON_IS_ATMEGA_32U4
+            &&
+            (_idleE == (PINE&_maskE)) &&
+            (_idleF == (PINF&_maskF))
+#endif
+            ){
             // Let function run once, then keep skipping until changes in registers
             if (_flag1) {
                 return;
@@ -184,18 +214,24 @@ void Bugtton::update(){
             if (_pins[i] < 8)       currentBit(i, PIND&(1<<_pins[i]) );
             else if (_pins[i] < 14) currentBit(i, PINB&(1<<(_pins[i]-8) ));
             else if (_pins[i] < 20) currentBit(i, PINC&(1<<(_pins[i]-14) ));
+#ifdef BUGTTON_IS_ATMEGA_32U4
             else if (_pins[i] < 22) currentBit(i, PINB&(1<<(_pins[i]-14) ));
-            else if (_pins[i] == 22) currentBit(i, PINC&(1<<(_pins[i]-16) ));
+            else if (_pins[i] < 24) currentBit(i, PINC&(1<<(_pins[i]-16) ));
             else if (_pins[i] == 30) currentBit(i, PINE&(1<<(_pins[i]-24) ));
+            else if (_pins[i] < 48) currentBit(i, PINF&(1<<(_pins[i]-40) ));
+#endif
         }
         // Active high (pull down)
         else{
             if (_pins[i] < 8)       currentBit(i, !(PIND&(1<<_pins[i])) );
             else if (_pins[i] < 14) currentBit(i, !(PINB&(1<<(_pins[i]-8)) ));
             else if (_pins[i] < 20) currentBit(i, !(PINC&(1<<(_pins[i]-14)) ));
+#ifdef BUGTTON_IS_ATMEGA_32U4
             else if (_pins[i] < 22) currentBit(i, !(PINB&(1<<(_pins[i]-14)) ));
-            else if (_pins[i] == 22) currentBit(i, !(PINC&(1<<(_pins[i]-16)) ));
+            else if (_pins[i] < 24) currentBit(i, !(PINC&(1<<(_pins[i]-16)) ));
             else if (_pins[i] == 30) currentBit(i, !(PINE&(1<<(_pins[i]-24)) ));
+            else if (_pins[i] < 48) currentBit(i, !(PINF&(1<<(_pins[i]-40)) ));
+#endif
         }
         //No change in button state
         if ( currentBit(i) == oldBit(i)){
@@ -252,6 +288,12 @@ void Bugtton::setMode(uint8_t i, uint8_t mode){
         if (i < 8) DDRD|=(1<<(i));
         else if (i < 14) DDRB|=(1<<(i-8));
         else if (i < 20) DDRC|=(1<<(i-14));
+#ifdef BUGTTON_IS_ATMEGA_32U4
+        else if (i < 22) DDRB|=(1<<(i-14));
+        else if (i < 24) DDRC|=(1<<(i-16));
+        else if (i == 30) DDRE|=(1<<(i-24));
+        else if (i < 48) DDRF|=(1<<(i-40));
+#endif
         // Defaults to LOW if coming from INPUT mode (HIGH if from INPUT_PULLUP)
     }
     else{
@@ -259,27 +301,36 @@ void Bugtton::setMode(uint8_t i, uint8_t mode){
         if (i < 8) DDRD&=~(1<<(i));
         else if (i < 14) DDRB&=~(1<<(i-8));
         else if (i < 20) DDRC&=~(1<<(i-14));
+#ifdef BUGTTON_IS_ATMEGA_32U4
         else if (i < 22) DDRB&=~(1<<(i-14));
-        else if (i == 22) DDRC&=~(1<<(i-16));
+        else if (i < 24) DDRC&=~(1<<(i-16));
         else if (i == 30) DDRE&=~(1<<(i-24));
+        else if (i < 48) DDRF&=~(1<<(i-40));
+#endif
         
         if (mode == INPUT_PULLUP){
             // Set PORT bit
             if (i < 8) PORTD|=(1<<(i));
             else if (i < 14) PORTB|=(1<<(i-8));
             else if (i < 20) PORTC|=(1<<(i-14));
+#ifdef BUGTTON_IS_ATMEGA_32U4
             else if (i < 22) PORTB|=(1<<(i-14));
-            else if (i == 22) PORTC|=(1<<(i-16));
+            else if (i < 24) PORTC|=(1<<(i-16));
             else if (i == 30) PORTE|=(1<<(i-24));
+            else if (i < 48) PORTF|=(1<<(i-40));
+#endif
         }
         else{
             // Clear PORT bit
             if (i < 8) PORTD&=~(1<<(i));
             else if (i < 14) PORTB&=~(1<<(i-8));
             else if (i < 20) PORTC&=~(1<<(i-14));
+#ifdef BUGTTON_IS_ATMEGA_32U4
             else if (i < 22) PORTB&=~(1<<(i-14));
-            else if (i == 22) PORTC&=~(1<<(i-16));
+            else if (i < 24) PORTC&=~(1<<(i-16));
             else if (i == 30) PORTE&=~(1<<(i-24));
+            else if (i < 48) PORTF&=~(1<<(i-40));
+#endif
         }
     }
 }

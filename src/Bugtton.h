@@ -33,9 +33,10 @@
 
 #include "Arduino.h"
 
-//No idea how to know if building for leonardo...
+//Still need to check if it's reliable to detect this way
 #if NUM_DIGITAL_PINS == 31 && NUM_ANALOG_INPUTS == 12
   #define BUGTTON_IS_ATMEGA_32U4
+  //#pragma message ("Bugtton using ATMEGA_32U4 mode")
 #endif
 
 // Read .cpp for comments
@@ -46,11 +47,17 @@ class Bugtton {
         uint8_t _maskD;
         uint8_t _maskB;
         uint8_t _maskC;
+#ifdef BUGTTON_IS_ATMEGA_32U4
         uint8_t _maskE;
+        uint8_t _maskF;
+#endif
         uint8_t _idleD;
         uint8_t _idleB;
         uint8_t _idleC;
+#ifdef BUGTTON_IS_ATMEGA_32U4
         uint8_t _idleE;
+        uint8_t _idleF;
+#endif
         uint8_t _count;
         uint8_t _debounceTime;
         bool _allStable;
